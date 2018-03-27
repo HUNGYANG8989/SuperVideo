@@ -19,11 +19,14 @@ import cn.bmob.v3.exception.BmobException;
 import cn.bmob.v3.listener.FindListener;
 
 public class MainActivity extends AppCompatActivity {
+    private final int PAGE_COUNT = 10;
+
     private RecyclerView mRV;
     private VideoListAdapter mAdapter;
     private SwipeRefreshLayout refreshLayout;
     private BmobQuery<Url> bmobQuery;
     private LoadingDialog loadingDialog;
+    private int curPage;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,26 +41,26 @@ public class MainActivity extends AppCompatActivity {
         bmobQuery = new BmobQuery<>();
 
         mAdapter = new VideoListAdapter(new ArrayList<Url>());
-        mRV.setLayoutManager(new LinearLayoutManager(this));
+        mAdapter.setEnableLoadMore(true);
         mAdapter.openLoadAnimation(BaseQuickAdapter.SCALEIN);
+        mRV.setLayoutManager(new LinearLayoutManager(this));
         mRV.setAdapter(mAdapter);
 
         refreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
             @Override
             public void onRefresh() {
-                bmobQuery.findObjects(new FindListener<Url>() {
-                    @Override
-                    public void done(List<Url> list, BmobException e) {
-                        refreshLayout.setRefreshing(false);
-                        if (e == null) {
-                            mAdapter.setNewData(list);
-                        } else {
-                            Toast.makeText(getApplicationContext(), e.getMessage(), Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                });
+                curPage = 0;
+                requestDatas();
             }
         });
+
+        mAdapter.setOnLoadMoreListener(new BaseQuickAdapter.RequestLoadMoreListener() {
+            @Override
+            public void onLoadMoreRequested() {
+                curPage += 1;
+                requestDatas();
+            }
+        }, mRV);
 
         mAdapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
             @Override
@@ -71,16 +74,39 @@ public class MainActivity extends AppCompatActivity {
         });
 
 
-        bmobQuery.findObjects(new FindListener<Url>() {
-            @Override
-            public void done(List<Url> list, BmobException e) {
-                loadingDialog.dismiss();
-                if (e == null) {
-                    mAdapter.setNewData(list);
-                } else {
-                    Toast.makeText(getApplicationContext(), e.getMessage(), Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
+        requestDatas();
+    }
+
+    private void requestDatas() {
+        bmobQuery
+                .setSkip(curPage * PAGE_COUNT)
+                .setLimit(PAGE_COUNT)//每页10条
+                .findObjects(new FindListener<Url>() {
+                    @Override
+                    public void done(List<Url> list, BmobException e) {
+                        loadingDialog.dismiss();
+                        refreshLayout.setRefreshing(false);
+
+                        if (e != null) {
+                            Toast.makeText(getApplicationContext(), e.getMessage(), Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        if (curPage <= 0) {
+                            mAdapter.setNewData(list);
+                            mAdapter.disableLoadMoreIfNotFullPage();
+                            if (list.size() < PAGE_COUNT) {
+                                mAdapter.loadMoreEnd(true);
+                            }
+                        } else {
+                            mAdapter.addData(list);
+                            if (list.size() < PAGE_COUNT) {
+                                mAdapter.loadMoreEnd(true);
+                            } else {
+                                mAdapter.loadMoreComplete();
+                            }
+                        }
+                    }
+                });
     }
 }

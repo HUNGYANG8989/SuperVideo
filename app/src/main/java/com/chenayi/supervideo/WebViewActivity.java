@@ -54,6 +54,25 @@ public class WebViewActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onPause() {
+        mAgentWeb.getWebLifeCycle().onPause();
+        super.onPause();
+
+    }
+
+    @Override
+    protected void onResume() {
+        mAgentWeb.getWebLifeCycle().onResume();
+        super.onResume();
+    }
+
+    @Override
+    protected void onDestroy() {
+        mAgentWeb.getWebLifeCycle().onDestroy();
+        super.onDestroy();
+    }
+
+    @Override
     public void onBackPressed() {
         if (!mAgentWeb.back()) {
             finish();
